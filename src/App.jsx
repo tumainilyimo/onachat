@@ -14,7 +14,7 @@ const TOPICS = [
   { id: 'ground-truth',    label: 'Ground truth & traditional phenotyping' },
 ]
 
-function Header() {
+function Header({ step, topicCount, onEditTopics }) {
   return (
     <header className="chat-header">
       <div className="avatar">B</div>
@@ -24,6 +24,26 @@ function Header() {
           <span className="status-dot" /> Online
         </div>
       </div>
+
+      {step === 'chat' && (
+        <button
+          type="button"
+          className="topics-summary"
+          onClick={onEditTopics}
+          aria-label="Edit selected topics"
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <path
+              d="M15 19l-7-7 7-7"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          <span>{topicCount > 0 ? `${topicCount} topic${topicCount > 1 ? 's' : ''}` : 'Topics'}</span>
+        </button>
+      )}
     </header>
   )
 }
@@ -34,7 +54,7 @@ function IntroPanel() {
       <h1 className="intro-title">Welcome to Bruno</h1>
       <p className="intro-body">
         I’m here to help you learn the product. Select one or more topics
-        you’re interested in, then ask your question below.
+        you’re interested in, then continue to start chatting.
       </p>
     </section>
   )
@@ -61,6 +81,37 @@ function TopicChips({ topics, selected, onToggle }) {
   )
 }
 
+function ContinueButton({ count, onClick }) {
+  const hasTopics = count > 0
+  return (
+    <div className="select-actions">
+      <div className="select-hint">
+        {hasTopics
+          ? `${count} topic${count > 1 ? 's' : ''} selected`
+          : 'No topics selected — you can still ask anything'}
+      </div>
+      <button
+        type="button"
+        className={`primary-cta ${hasTopics ? 'is-emphasized' : ''}`}
+        onClick={onClick}
+      >
+        <span>{hasTopics ? 'Continue' : 'Start chatting'}</span>
+        <span className="cta-arrow" aria-hidden>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <path
+              d="M5 12h14M13 6l6 6-6 6"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </span>
+      </button>
+    </div>
+  )
+}
+
 function Bubble({ message }) {
   const isBot = message.from === 'bot'
   return (
@@ -82,7 +133,7 @@ function TypingBubble() {
   )
 }
 
-function Composer({ value, onChange, onSend, disabled }) {
+function Composer({ value, onChange, onSend, autoFocus }) {
   const ref = useRef(null)
 
   useEffect(() => {
@@ -92,6 +143,10 @@ function Composer({ value, onChange, onSend, disabled }) {
     el.style.height = Math.min(el.scrollHeight, 140) + 'px'
   }, [value])
 
+  useEffect(() => {
+    if (autoFocus && ref.current) ref.current.focus()
+  }, [autoFocus])
+
   const handleKey = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
@@ -99,7 +154,7 @@ function Composer({ value, onChange, onSend, disabled }) {
     }
   }
 
-  const canSend = value.trim().length > 0 && !disabled
+  const canSend = value.trim().length > 0
 
   return (
     <div className="composer">
@@ -134,6 +189,7 @@ function Composer({ value, onChange, onSend, disabled }) {
 }
 
 export default function App() {
+  const [step, setStep] = useState('select') // 'select' | 'chat'
   const [messages, setMessages] = useState([])
   const [draft, setDraft] = useState('')
   const [isTyping, setIsTyping] = useState(false)
@@ -190,27 +246,43 @@ export default function App() {
   return (
     <div className="page">
       <section className="chat" aria-label="Chat with Bruno">
-        <Header />
-
-        <div className="top-panel">
-          <IntroPanel />
-          <TopicChips
-            topics={TOPICS}
-            selected={selected}
-            onToggle={toggleTopic}
-          />
-        </div>
-
-        <main className="chat-scroll" ref={scrollRef}>
-          {renderedMessages}
-          {isTyping && <TypingBubble />}
-        </main>
-
-        <Composer
-          value={draft}
-          onChange={setDraft}
-          onSend={() => sendMessage(draft)}
+        <Header
+          step={step}
+          topicCount={selected.size}
+          onEditTopics={() => setStep('select')}
         />
+
+        {step === 'select' ? (
+          <>
+            <div className="select-body view-fade">
+              <IntroPanel />
+              <div className="topics-center">
+                <TopicChips
+                  topics={TOPICS}
+                  selected={selected}
+                  onToggle={toggleTopic}
+                />
+              </div>
+            </div>
+            <ContinueButton
+              count={selected.size}
+              onClick={() => setStep('chat')}
+            />
+          </>
+        ) : (
+          <>
+            <main className="chat-scroll view-fade" ref={scrollRef}>
+              {renderedMessages}
+              {isTyping && <TypingBubble />}
+            </main>
+            <Composer
+              value={draft}
+              onChange={setDraft}
+              onSend={() => sendMessage(draft)}
+              autoFocus
+            />
+          </>
+        )}
       </section>
     </div>
   )
